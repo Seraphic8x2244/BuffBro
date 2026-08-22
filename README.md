@@ -1,4 +1,4 @@
-BuffBro Vanilla
+# BuffBro Vanilla
 
 - Spiritual Successor to PallyPower
 - Work in Progress, but eventually will work similar to pallypower but work for all classes
