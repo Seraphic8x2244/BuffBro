@@ -180,6 +180,13 @@
     </Frame>
 
     <Frame name="BuffBroMiniFrame" parent="UIParent" enableMouse="true" movable="true">
+        <Anchors>
+            <Anchor point="CENTER" relativePoint="CENTER">
+                <Offset>
+                    <AbsDimension x="0" y="-180"/>
+                </Offset>
+            </Anchor>
+        </Anchors>
         <Size>
             <AbsDimension x="102" y="32"/>
         </Size>
@@ -216,46 +223,47 @@
                     </Anchor>
                 </Anchors>
                 <Layers>
-                    <Layer level="BACKGROUND">
-                        <Texture name="BuffBroCastBorder" file="Interface\Buttons\WHITE8X8">
-                            <Anchors>
-                                <Anchor point="TOPLEFT"/>
-                                <Anchor point="BOTTOMRIGHT"/>
-                            </Anchors>
-                        </Texture>
-                    </Layer>
                     <Layer level="ARTWORK">
                         <Texture name="BuffBroCastIcon">
                             <Anchors>
-                                <Anchor point="TOPLEFT">
-                                    <Offset><AbsDimension x="2" y="-2"/></Offset>
-                                </Anchor>
-                                <Anchor point="BOTTOMRIGHT">
-                                    <Offset><AbsDimension x="-2" y="2"/></Offset>
-                                </Anchor>
+                                <Anchor point="TOPLEFT"><Offset><AbsDimension x="2" y="-2"/></Offset></Anchor>
+                                <Anchor point="BOTTOMRIGHT"><Offset><AbsDimension x="-2" y="2"/></Offset></Anchor>
                             </Anchors>
                         </Texture>
                     </Layer>
                     <Layer level="OVERLAY">
-                        <Texture file="Interface\Buttons\UI-Quickslot-Depress">
-                            <Anchors>
-                                <Anchor point="TOPLEFT"/>
-                                <Anchor point="BOTTOMRIGHT"/>
-                            </Anchors>
+                        <Texture name="BuffBroCastBorderTop" file="Interface\Buttons\WHITE8X8">
+                            <Size><AbsDimension x="30" y="2"/></Size>
+                            <Anchors><Anchor point="TOP"/></Anchors>
+                        </Texture>
+                        <Texture name="BuffBroCastBorderBottom" file="Interface\Buttons\WHITE8X8">
+                            <Size><AbsDimension x="30" y="2"/></Size>
+                            <Anchors><Anchor point="BOTTOM"/></Anchors>
+                        </Texture>
+                        <Texture name="BuffBroCastBorderLeft" file="Interface\Buttons\WHITE8X8">
+                            <Size><AbsDimension x="2" y="26"/></Size>
+                            <Anchors><Anchor point="LEFT"/></Anchors>
+                        </Texture>
+                        <Texture name="BuffBroCastBorderRight" file="Interface\Buttons\WHITE8X8">
+                            <Size><AbsDimension x="2" y="26"/></Size>
+                            <Anchors><Anchor point="RIGHT"/></Anchors>
                         </Texture>
                     </Layer>
                 </Layers>
                 <Frames>
-                    <Cooldown name="BuffBroCastCooldown" inherits="CooldownFrameTemplate">
+                    <Frame name="BuffBroCastCooldownAnchor">
+                        <Size><AbsDimension x="26" y="26"/></Size>
                         <Anchors>
-                            <Anchor point="TOPLEFT" relativeTo="BuffBroCastIcon" relativePoint="TOPLEFT"/>
-                            <Anchor point="BOTTOMRIGHT" relativeTo="BuffBroCastIcon" relativePoint="BOTTOMRIGHT"/>
+                            <Anchor point="CENTER" relativeTo="BuffBroCastIcon" relativePoint="CENTER"/>
                         </Anchors>
-                    </Cooldown>
+                    </Frame>
                 </Frames>
                 <Scripts>
+                    <OnLoad>
+                        this:RegisterForClicks("LeftButtonUp", "RightButtonUp");
+                    </OnLoad>
                     <OnClick>
-                        BuffBro_CastButton_OnClick();
+                        BuffBro_CastButton_OnClick(arg1);
                     </OnClick>
                     <OnEnter>
                         BuffBro_CastButton_OnEnter();
