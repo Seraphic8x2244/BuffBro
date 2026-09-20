@@ -29,6 +29,7 @@ local BB = BuffBro
 BB.ADDON_NAME = "BuffBro"
 BB.VERSION = GetAddOnMetadata(BB.ADDON_NAME, "Version") or "unknown"
 BB.PP_PREFIX = "PLPWR"
+BB.GCD_SPELL_ID = 61304
 BB.RECONCILE_SECONDS = 2.0
 
 BB.State = {
@@ -75,6 +76,8 @@ BB.Executor = {
     pending = nil,
     lastResult = nil,
 }
+
+BB.ReagentCounts = {}
 
 BuffBroDB = BuffBroDB or {}
 
@@ -494,6 +497,8 @@ function BB.ScanLocalProvider(reason)
                     rankText = spellRank,
                     rank = rankNumber,
                     icon = (info and info.iconID) or GetSpellTexture(i, BOOKTYPE_SPELL),
+                    reagents = (spellID and C_Spell and C_Spell.GetSpellReagents)
+                        and C_Spell.GetSpellReagents(spellID) or nil,
                 }
             end
         end
@@ -527,6 +532,10 @@ function BB.ScanLocalProvider(reason)
     provider.sources.localSpellbook = true
 
     BB.LocalProvider.state = "READY"
+
+    if BB.RefreshReagentCounts then
+        BB.RefreshReagentCounts()
+    end
 
     if changed then
         BB.LocalProvider.generation = BB.LocalProvider.generation + 1
@@ -867,7 +876,7 @@ end
 --   * Shift only overrides the CURRENT blocked job, never jumps elsewhere.
 -- ============================================================================
 
-local function BB_PreflightJob(job)
+local function BB_PreflightJob(job, castMode)
     local result = {
         actionable = true,
         status = "READY",
@@ -928,7 +937,7 @@ local function BB_PreflightJob(job)
     --   nil   = range cannot be determined / does not apply
     --
     -- UNKNOWN remains actionable; only a known false blocks SMART.
-    local rangeSpell = BB.ResolveJobSpell and BB.ResolveJobSpell(job) or nil
+    local rangeSpell = BB.ResolveJobSpell and BB.ResolveJobSpell(job, castMode) or nil
     result.rangeSpellID = rangeSpell and rangeSpell.spellID or nil
     result.rangeSpellName = rangeSpell and rangeSpell.name or nil
 
@@ -1005,7 +1014,7 @@ function BB.BuildExecutionQueue()
 
     for i, job in ipairs(BB.State.rawQueue) do
         job.baseOrder = i
-        job.preflight = BB_PreflightJob(job)
+        job.preflight = BB_PreflightJob(job, castMode)
 
         local key = BB_JobKey(job)
         job.queueKey = key
@@ -1089,6 +1098,33 @@ end
 -- MINI UI POSITION
 -- ============================================================================
 
+function BB.CreateCastCooldown()
+    if BuffBroCastCooldown then return end
+    if not BuffBroCastButton or not BuffBroCastCooldownAnchor then return end
+
+    local cooldown = CreateFrame(
+        "Model",
+        "BuffBroCastCooldown",
+        BuffBroCastButton,
+        "CooldownFrameTemplate"
+    )
+
+    cooldown:SetWidth(36)
+    cooldown:SetHeight(36)
+    cooldown:SetPoint(
+        "CENTER",
+        BuffBroCastCooldownAnchor,
+        "CENTER",
+        0,
+        0
+    )
+    cooldown:SetScale(26 / 36)
+    cooldown:SetFrameLevel(BuffBroCastButton:GetFrameLevel() + 5)
+
+    BuffBroCastCooldown = cooldown
+    CooldownFrame_SetTimer(BuffBroCastCooldown, 0, 0, 0)
+end
+
 function BB.RestoreMiniPosition()
     if not BuffBroMiniFrame then return end
 
@@ -1158,19 +1194,80 @@ end
 -- the player's current target.
 -- ============================================================================
 
-function BB.ResolveJobSpell(job)
+function BB.RefreshReagentCounts()
+    local counts = {}
+    local needed = {}
+    local family, kind, spell, _, reagent
+
+    for family = 0, 5 do
+        local familySpells = BB.LocalSpells[family]
+        if familySpells then
+            for _, kind in ipairs({ "normal", "greater" }) do
+                spell = familySpells[kind]
+                if spell and spell.reagents then
+                    for _, reagent in ipairs(spell.reagents) do
+                        if reagent.itemID and reagent.itemID > 0 then
+                            needed[reagent.itemID] = true
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    local itemID
+    for itemID in pairs(needed) do
+        if C_Item and C_Item.GetItemCount then
+            counts[itemID] = C_Item.GetItemCount(itemID, false) or 0
+        else
+            counts[itemID] = 0
+        end
+    end
+
+    BB.ReagentCounts = counts
+end
+
+function BB.HasSpellReagents(spell)
+    if not spell then return false end
+    if not spell.reagents or table.getn(spell.reagents) == 0 then
+        return true
+    end
+
+    local _, reagent
+    for _, reagent in ipairs(spell.reagents) do
+        local have = BB.ReagentCounts[reagent.itemID] or 0
+        local need = reagent.count or 1
+        if have < need then
+            return false
+        end
+    end
+
+    return true
+end
+
+function BB.ResolveJobSpell(job, castMode)
     if not job then return nil end
 
     local familySpells = BB.LocalSpells[job.family]
     if not familySpells then return nil end
 
-    -- PallyPower-style individual overrides are normal Blessings.
+    -- PallyPower individual overrides are explicitly normal Blessings.
     if job.assignmentType == "INDIVIDUAL" then
         return familySpells.normal
     end
 
-    -- Class assignments prefer Greater Blessings when learned.
-    return familySpells.greater or familySpells.normal
+    if castMode == "NORMAL" then
+        return familySpells.normal
+    end
+
+    -- AUTO / left-click:
+    -- Greater only when learned AND its actual spell reagents are available.
+    -- This is data-driven through ClassicAPI rather than hardcoding Symbols.
+    if familySpells.greater and BB.HasSpellReagents(familySpells.greater) then
+        return familySpells.greater
+    end
+
+    return familySpells.normal
 end
 
 local function BB_SetExecutorResult(status, job, spell, detail)
@@ -1185,7 +1282,7 @@ local function BB_SetExecutorResult(status, job, spell, detail)
     }
 end
 
-function BB.ExecuteNext(forceBlocked)
+function BB.ExecuteNext(forceBlocked, castMode)
     BB.BuildExecutionQueue()
 
     local job = BB.GetCurrentJob()
@@ -1213,7 +1310,7 @@ function BB.ExecuteNext(forceBlocked)
 
     local forced = (not job.preflight.actionable) and forceBlocked and true or false
 
-    local spell = BB.ResolveJobSpell(job)
+    local spell = BB.ResolveJobSpell(job, castMode)
     if not spell or not spell.spellID then
         BB_SetExecutorResult("NO_SPELL", job, spell, nil)
         BB.UpdateMiniUI()
@@ -1245,6 +1342,7 @@ function BB.ExecuteNext(forceBlocked)
             targetGUID = job.targetGUID,
             targetName = job.targetName,
             forcedBlocked = forced,
+            castMode = castMode or "AUTO",
             startedAt = GetTime(),
         }
         BB_SetExecutorResult(
@@ -1271,39 +1369,47 @@ function BB.ExecuteNext(forceBlocked)
     return accepted
 end
 
-function BuffBro_CastButton_OnClick()
-    BB.ExecuteNext(IsShiftKeyDown() and true or false)
+function BuffBro_CastButton_OnClick(button)
+    button = button or arg1
+
+    local castMode = "AUTO"
+    if button == "RightButton" then
+        castMode = "NORMAL"
+    end
+
+    BB.ExecuteNext(IsShiftKeyDown() and true or false, castMode)
 end
 
 local function BB_UpdateCastBorder(job)
-    if not BuffBroCastBorder then return end
-
     local color = job and BB.ClassColors[job.targetClass]
-    if color then
-        BuffBroCastBorder:SetVertexColor(color[1], color[2], color[3])
-    else
-        BuffBroCastBorder:SetVertexColor(0.65, 0.65, 0.65)
-    end
+    local r, g, b = 0.65, 0.65, 0.65
+    if color then r, g, b = color[1], color[2], color[3] end
+
+    if BuffBroCastBorderTop then BuffBroCastBorderTop:SetVertexColor(r, g, b) end
+    if BuffBroCastBorderBottom then BuffBroCastBorderBottom:SetVertexColor(r, g, b) end
+    if BuffBroCastBorderLeft then BuffBroCastBorderLeft:SetVertexColor(r, g, b) end
+    if BuffBroCastBorderRight then BuffBroCastBorderRight:SetVertexColor(r, g, b) end
 end
 
 local function BB_UpdateCastCooldown(job, spell)
     if not BuffBroCastCooldown then return end
 
-    if not job or not spell or not spell.spellbookIndex then
-        BuffBroCastCooldown:SetCooldown(0, 0)
-        BuffBroCastCooldown:Hide()
-        return
+    -- Use the dedicated GCD probe spell instead of the queued Blessing.
+    local info = nil
+    if C_Spell and C_Spell.GetSpellCooldown then
+        info = C_Spell.GetSpellCooldown(BB.GCD_SPELL_ID)
     end
 
-    local start, duration, enabled =
-        GetSpellCooldown(spell.spellbookIndex, BOOKTYPE_SPELL)
-
-    if enabled ~= 0 and start and duration and duration > 0 then
-        BuffBroCastCooldown:SetCooldown(start, duration)
-        BuffBroCastCooldown:Show()
+    if info and info.startTime and info.duration and
+       info.startTime > 0 and info.duration > 0 and info.isEnabled ~= false then
+        CooldownFrame_SetTimer(
+            BuffBroCastCooldown,
+            info.startTime,
+            info.duration,
+            1
+        )
     else
-        BuffBroCastCooldown:SetCooldown(0, 0)
-        BuffBroCastCooldown:Hide()
+        CooldownFrame_SetTimer(BuffBroCastCooldown, 0, 0, 0)
     end
 end
 
@@ -1396,9 +1502,21 @@ function BB.RenderCastTooltip()
         return
     end
 
-    local spell = BB.ResolveJobSpell(job)
+    local spell = BB.ResolveJobSpell(job, "AUTO")
     GameTooltip:SetText(spell and spell.name or job.familyName, 1, 1, 1)
     GameTooltip:AddLine(tostring(job.targetName), 0.8, 0.8, 0.8)
+
+    local familySpells = BB.LocalSpells[job.family]
+    if job.assignmentType ~= "INDIVIDUAL" and familySpells and familySpells.normal then
+        if familySpells.greater then
+            if BB.HasSpellReagents(familySpells.greater) then
+                GameTooltip:AddLine("Left-click: Greater Blessing", 0.7, 0.9, 0.7)
+            else
+                GameTooltip:AddLine("Left-click: normal (no Greater reagent)", 1, 0.75, 0.3)
+            end
+        end
+        GameTooltip:AddLine("Right-click: normal Blessing", 0.75, 0.75, 0.9)
+    end
 
     if job.preflight and not job.preflight.actionable then
         GameTooltip:AddLine(
@@ -1462,6 +1580,7 @@ local function BB_ExecutorSpellEvent(event, unit, castGUID, spellID, spellName, 
     if event == "UNIT_SPELLCAST_SUCCEEDED" then
         BB_SetExecutorResult("SUCCEEDED", pending.job, pending.spell, castGUID)
         BB.Executor.pending = nil
+        BB.UpdateMiniUI()
 
         -- Give the aura state a moment to land, then let Detection rebuild
         -- the queues. UNIT_AURA normally beats this; this is cheap insurance.
@@ -1955,6 +2074,8 @@ function BuffBro_OnLoad()
     BuffBroEventFrame:RegisterEvent("UNIT_CONNECTION")
     BuffBroEventFrame:RegisterEvent("SPELLS_CHANGED")
     BuffBroEventFrame:RegisterEvent("SPELL_UPDATE_COOLDOWN")
+    BuffBroEventFrame:RegisterEvent("ACTIONBAR_UPDATE_COOLDOWN")
+    BuffBroEventFrame:RegisterEvent("BAG_UPDATE_DELAYED")
     BuffBroEventFrame:RegisterEvent("CHAT_MSG_ADDON")
     BuffBroEventFrame:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
     BuffBroEventFrame:RegisterEvent("UNIT_SPELLCAST_FAILED")
@@ -1966,7 +2087,6 @@ function BuffBro_OnLoad()
     SlashCmdList["BUFFBRO"] = BB_Slash
 
     BB._reconcileElapsed = 0
-    BB.RestoreMiniPosition()
 
     if BuffBroDebugTitle then
         BuffBroDebugTitle:SetText("BuffBro Debug v" .. tostring(BB.VERSION))
@@ -1979,6 +2099,9 @@ function BuffBro_OnEvent(event, arg1, arg2, arg3, arg4)
     if not BB.classicAPIReady then return end
 
     if event == "PLAYER_LOGIN" then
+        BB.RestoreMiniPosition()
+        BB.CreateCastCooldown()
+
         local ready, changed = BB.ScanLocalProvider(event)
         if ready and changed then
             BB.RefreshProviderDependents(event)
@@ -1987,8 +2110,23 @@ function BuffBro_OnEvent(event, arg1, arg2, arg3, arg4)
         return
     end
 
-    if event == "SPELL_UPDATE_COOLDOWN" then
+    if event == "SPELL_UPDATE_COOLDOWN" or
+       event == "ACTIONBAR_UPDATE_COOLDOWN" then
         BB.UpdateMiniUI()
+        return
+    end
+
+    if event == "BAG_UPDATE_DELAYED" then
+        BB.RefreshReagentCounts()
+
+        -- Reagent availability can change AUTO from Greater -> normal or back.
+        -- Rebuild pre-flight because custom servers may give those spells
+        -- different ranges.
+        if BB.IsLocalProviderReady() then
+            BB.BuildExecutionQueue()
+        else
+            BB.UpdateMiniUI()
+        end
         return
     end
 
