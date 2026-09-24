@@ -91,7 +91,7 @@
 - `BuffBro.toc` now has one runtime entry, `BuffBro.lua`; there is no `BuffBro.xml` or `UI.lua` runtime entry.
 - The new `BB.CreateUI()` function adds five function-local variables and no new top-level locals, avoiding pressure on Lua 5.0's top-level local-variable limit.
 - The inserted UI path uses only established Vanilla-era frame methods/templates already represented by the XML design; no backend, PallyPower, ClassicAPI, reagent, queue, executor, or GCD semantics were changed.
-- A Lua 5.0 compiler was not available in the execution environment, so this checkpoint is statically reviewed but not compiler- or in-game-validated.
+- Compiler check corrected: the environment provides `texlua` with Lua 5.3. The inserted Lua-only UI construction/bootstrap parses successfully with `loadfile`, and this compiler also enforces the 200-local-per-function limit. It is not an exact Lua 5.0 compiler, so target-client runtime validation is still required.
 
 ## Current Issues
 - The Lua-only UI migration has not yet been runtime-tested; clean load, visual parity, interaction parity, saved-position behaviour, and debug-window behaviour remain validation debt.
