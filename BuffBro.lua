@@ -2056,6 +2056,284 @@ local function BB_Slash(msg)
 end
 
 -- ============================================================================
+-- UI CONSTRUCTION
+-- ============================================================================
+--
+-- The original prototype defined these frames in BuffBro.xml. Keep the named
+-- globals while existing runtime code still addresses them directly, but make
+-- BuffBro.lua the single runtime implementation source.
+function BB.CreateUI()
+    local frame, button, texture, scrollChild, fontString
+
+    frame = CreateFrame("Frame", "BuffBroEventFrame")
+    frame:SetScript("OnLoad", BuffBro_OnLoad)
+    frame:SetScript("OnEvent", function()
+        BuffBro_OnEvent(event, arg1, arg2, arg3, arg4)
+    end)
+    frame:SetScript("OnUpdate", function()
+        BuffBro_OnUpdate(arg1)
+    end)
+    BB.UI.eventFrame = frame
+
+    frame = CreateFrame("Frame", "BuffBroDebugFrame", UIParent)
+    frame:SetWidth(620)
+    frame:SetHeight(430)
+    frame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+    frame:SetBackdrop({
+        bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
+        edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+        tile = true,
+        tileSize = 32,
+        edgeSize = 32,
+        insets = { left = 11, right = 12, top = 12, bottom = 11 },
+    })
+    frame:SetMovable(true)
+    frame:EnableMouse(true)
+    frame:SetScript("OnMouseDown", function()
+        if arg1 == "LeftButton" then
+            BuffBroDebugFrame:StartMoving()
+        end
+    end)
+    frame:SetScript("OnMouseUp", function()
+        BuffBroDebugFrame:StopMovingOrSizing()
+    end)
+    BB.UI.debugFrame = frame
+
+    fontString = frame:CreateFontString(
+        "BuffBroDebugTitle",
+        "ARTWORK",
+        "GameFontNormalLarge"
+    )
+    fontString:SetText("BuffBro Debug")
+    fontString:SetPoint("TOP", frame, "TOP", 0, -16)
+
+    fontString = frame:CreateFontString(
+        "BuffBroDebugSubtitle",
+        "ARTWORK",
+        "GameFontHighlightSmall"
+    )
+    fontString:SetText("Backend / execution queue / executor state")
+    fontString:SetPoint("TOP", BuffBroDebugTitle, "BOTTOM", 0, -2)
+
+    button = CreateFrame(
+        "Button",
+        "BuffBroDebugClose",
+        frame,
+        "UIPanelCloseButton"
+    )
+    button:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -4, -4)
+
+    button = CreateFrame(
+        "Button",
+        "BuffBroDebugRosterButton",
+        frame,
+        "UIPanelButtonTemplate"
+    )
+    button:SetWidth(82)
+    button:SetHeight(22)
+    button:SetText("Roster")
+    button:SetPoint("TOPLEFT", frame, "TOPLEFT", 18, -48)
+    button:SetScript("OnClick", function()
+        BuffBro_DebugShow("roster")
+    end)
+
+    button = CreateFrame(
+        "Button",
+        "BuffBroDebugProvidersButton",
+        frame,
+        "UIPanelButtonTemplate"
+    )
+    button:SetWidth(82)
+    button:SetHeight(22)
+    button:SetText("Providers")
+    button:SetPoint("LEFT", BuffBroDebugRosterButton, "RIGHT", 4, 0)
+    button:SetScript("OnClick", function()
+        BuffBro_DebugShow("providers")
+    end)
+
+    button = CreateFrame(
+        "Button",
+        "BuffBroDebugAssignmentsButton",
+        frame,
+        "UIPanelButtonTemplate"
+    )
+    button:SetWidth(90)
+    button:SetHeight(22)
+    button:SetText("Assignments")
+    button:SetPoint("LEFT", BuffBroDebugProvidersButton, "RIGHT", 4, 0)
+    button:SetScript("OnClick", function()
+        BuffBro_DebugShow("assignments")
+    end)
+
+    button = CreateFrame(
+        "Button",
+        "BuffBroDebugAurasButton",
+        frame,
+        "UIPanelButtonTemplate"
+    )
+    button:SetWidth(72)
+    button:SetHeight(22)
+    button:SetText("Auras")
+    button:SetPoint("LEFT", BuffBroDebugAssignmentsButton, "RIGHT", 4, 0)
+    button:SetScript("OnClick", function()
+        BuffBro_DebugShow("auras")
+    end)
+
+    button = CreateFrame(
+        "Button",
+        "BuffBroDebugQueueButton",
+        frame,
+        "UIPanelButtonTemplate"
+    )
+    button:SetWidth(72)
+    button:SetHeight(22)
+    button:SetText("Queue")
+    button:SetPoint("LEFT", BuffBroDebugAurasButton, "RIGHT", 4, 0)
+    button:SetScript("OnClick", function()
+        BuffBro_DebugShow("queue")
+    end)
+
+    button = CreateFrame(
+        "Button",
+        "BuffBroDebugRefreshButton",
+        frame,
+        "UIPanelButtonTemplate"
+    )
+    button:SetWidth(78)
+    button:SetHeight(22)
+    button:SetText("Refresh")
+    button:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -20, -48)
+    button:SetScript("OnClick", function()
+        BuffBro.ScanLocalProvider("debug")
+        BuffBro.RebuildRoster("debug")
+        BuffBro_DebugRender(BuffBro.Debug.view or "queue")
+    end)
+
+    button = CreateFrame(
+        "ScrollFrame",
+        "BuffBroDebugScrollFrame",
+        frame,
+        "UIPanelScrollFrameTemplate"
+    )
+    button:SetPoint("TOPLEFT", frame, "TOPLEFT", 22, -82)
+    button:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -44, 22)
+
+    scrollChild = CreateFrame("Frame", "BuffBroDebugScrollChild", button)
+    scrollChild:SetWidth(540)
+    scrollChild:SetHeight(1200)
+    button:SetScrollChild(scrollChild)
+
+    fontString = scrollChild:CreateFontString(
+        "BuffBroDebugText",
+        "ARTWORK",
+        "GameFontHighlightSmall"
+    )
+    fontString:SetWidth(530)
+    fontString:SetHeight(1180)
+    fontString:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", 4, -4)
+    fontString:SetJustifyH("LEFT")
+    fontString:SetJustifyV("TOP")
+
+    frame:Hide()
+
+    frame = CreateFrame("Frame", "BuffBroMiniFrame", UIParent)
+    frame:SetWidth(102)
+    frame:SetHeight(32)
+    frame:SetPoint("CENTER", UIParent, "CENTER", 0, -180)
+    frame:SetMovable(true)
+    frame:EnableMouse(true)
+    BB.UI.miniFrame = frame
+
+    button = CreateFrame(
+        "Button",
+        "BuffBroMenuButton",
+        frame,
+        "UIPanelButtonTemplate"
+    )
+    button:SetWidth(34)
+    button:SetHeight(30)
+    button:SetText("BB")
+    button:SetPoint("LEFT", frame, "LEFT", 0, 0)
+    button:SetScript("OnClick", function()
+        BuffBro_MenuButton_OnClick()
+    end)
+    button:SetScript("OnMouseDown", function()
+        BuffBro_MenuButton_OnMouseDown()
+    end)
+    button:SetScript("OnMouseUp", function()
+        BuffBro_MenuButton_OnMouseUp()
+    end)
+    BB.UI.menuButton = button
+
+    button = CreateFrame("Button", "BuffBroCastButton", frame)
+    button:SetWidth(30)
+    button:SetHeight(30)
+    button:SetPoint("LEFT", BuffBroMenuButton, "RIGHT", 4, 0)
+    button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    button:SetScript("OnClick", function()
+        BuffBro_CastButton_OnClick(arg1)
+    end)
+    button:SetScript("OnEnter", function()
+        BuffBro_CastButton_OnEnter()
+    end)
+    button:SetScript("OnLeave", function()
+        BuffBro_CastButton_OnLeave()
+    end)
+    BB.UI.castButton = button
+
+    texture = button:CreateTexture("BuffBroCastIcon", "ARTWORK")
+    texture:SetPoint("TOPLEFT", button, "TOPLEFT", 2, -2)
+    texture:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -2, 2)
+
+    texture = button:CreateTexture("BuffBroCastBorderTop", "OVERLAY")
+    texture:SetTexture("Interface\\Buttons\\WHITE8X8")
+    texture:SetWidth(30)
+    texture:SetHeight(2)
+    texture:SetPoint("TOP", button, "TOP", 0, 0)
+
+    texture = button:CreateTexture("BuffBroCastBorderBottom", "OVERLAY")
+    texture:SetTexture("Interface\\Buttons\\WHITE8X8")
+    texture:SetWidth(30)
+    texture:SetHeight(2)
+    texture:SetPoint("BOTTOM", button, "BOTTOM", 0, 0)
+
+    texture = button:CreateTexture("BuffBroCastBorderLeft", "OVERLAY")
+    texture:SetTexture("Interface\\Buttons\\WHITE8X8")
+    texture:SetWidth(2)
+    texture:SetHeight(26)
+    texture:SetPoint("LEFT", button, "LEFT", 0, 0)
+
+    texture = button:CreateTexture("BuffBroCastBorderRight", "OVERLAY")
+    texture:SetTexture("Interface\\Buttons\\WHITE8X8")
+    texture:SetWidth(2)
+    texture:SetHeight(26)
+    texture:SetPoint("RIGHT", button, "RIGHT", 0, 0)
+
+    scrollChild = CreateFrame("Frame", "BuffBroCastCooldownAnchor", button)
+    scrollChild:SetWidth(26)
+    scrollChild:SetHeight(26)
+    scrollChild:SetPoint("CENTER", BuffBroCastIcon, "CENTER", 0, 0)
+
+    button = CreateFrame(
+        "Button",
+        "BuffBroStatusButton",
+        frame,
+        "UIPanelButtonTemplate"
+    )
+    button:SetWidth(30)
+    button:SetHeight(22)
+    button:SetPoint("LEFT", BuffBroCastButton, "RIGHT", 4, 0)
+    button:SetScript("OnEnter", function()
+        BuffBro_StatusButton_OnEnter()
+    end)
+    button:SetScript("OnLeave", function()
+        BuffBro_StatusButton_OnLeave()
+    end)
+    button:Hide()
+    BB.UI.statusButton = button
+end
+
+-- ============================================================================
 -- EVENTS / LIFECYCLE
 -- ============================================================================
 
@@ -2237,3 +2515,6 @@ function BuffBro_OnUpdate(elapsed)
         BB.BuildRawQueue()
     end
 end
+
+BB.CreateUI()
+BuffBro_OnLoad()

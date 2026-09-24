@@ -7,4 +7,3 @@
 ## SavedVariables: BuffBroDB
 
 BuffBro.lua
-BuffBro.xml
