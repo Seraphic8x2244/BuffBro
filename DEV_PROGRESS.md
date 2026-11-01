@@ -3,7 +3,7 @@
 > Live project-development context for a fresh chat. Keep this current and concise. Remove or compress superseded detail once it no longer affects future work.
 
 ## Current
-- Latest audited `dev` branch head before this status-only update: `4772b7c06c7d88fe427294bcff83a52067692612` (2026-09-26); runtime source remains `7ee4868e88b2cc77b68a5906068fedee5360c8d0`.
+- Latest audited `dev` branch head before this status-only update: `f2d4dfb2f9146d7d330857d0a74523a2c2fd306d` (2026-11-01); runtime source remains `7ee4868e88b2cc77b68a5906068fedee5360c8d0`.
 - Branch: `dev`
 - Version: `0.1.7-dev`
 - Development source head: `7ee4868e88b2cc77b68a5906068fedee5360c8d0` (Lua-only UI migration implementation; verified live `dev` head before this status-only update).
@@ -23,6 +23,13 @@
 - The XML review is resolved and implemented: `BuffBro.xml` has been removed. Its event frame, mini UI, debug UI, textures, font strings, buttons, scroll frame, cooldown anchor, and script wiring are now constructed programmatically in `BuffBro.lua`.
 - Lua-created UI should have explicit ownership under BuffBro's UI structures where practical; use named globals only where a Blizzard template/API genuinely requires them or where temporary parity wiring makes migration safer.
 - Dynamic frame construction is an implementation detail only; authoritative addon state remains in the existing backend pipeline.
+
+### Product Direction — BuffBro-Native Coordination (clarified 2026-11-01)
+- BuffBro is a ground-up, class-extensible raid-buff addon, **not** a PallyPower replacement constrained to PallyPower's buffing/assignment workflow. Stop treating PallyPower feature parity or its class-only one-Blessing-per-cell scheme as the product specification.
+- PallyPower is optional compatibility input and a visual reference only. BuffBro owns assignment intent, provider/capability state, aura detection, execution and eventual BuffBro-native coordination protocol.
+- The user explicitly wants to reuse the **redesigned PallyPowerVanilla assignment window's look** (especially class-coloured connectors and visibility presentation) while redesigning assignment interaction, targeting, scheduling and player/provider workflows independently.
+- A visual reference does not authorize copying PPV's fixed 12-Paladin x 14-column grid, legacy storage/globals, cycling semantics, special-button visibility semantics, or communication/control authority rules.
+- This is a future UI/product direction, **not** permission to interrupt the outstanding 0.1.7-dev Lua-only UI runtime parity and GCD gate. Before code work, define a BuffBro-native assignment data contract and UI projection; no code or version change occurred in this audit.
 
 ### Invariants
 - `PLAYER_LOGIN` performs the initial provider scan; `SPELLS_CHANGED` is the authoritative spellbook lifecycle signal.
@@ -129,6 +136,16 @@ Runtime source: `7ee4868e88b2cc77b68a5906068fedee5360c8d0` (`0.1.7-dev`; any fol
 - Scope unchanged: this was a read-only code review plus status documentation update, not a runtime code change or a request to broaden provider implementation. Continue the previously agreed gate before changes to GCD, assignment protocol, or new providers.
 - Exact next step: runtime-test the `0.1.7-dev` Lua-only UI at runtime-source commit `7ee4868e88b2cc77b68a5906068fedee5360c8d0` using the checklist below; then isolate GCD timer data versus rendering. Only after this gate plan independent assignment UI/protocol and impending-expiry rebuffs.
 
+## PPV Window Visual Audit — 2026-11-01 (status-only)
+- Sources: `Seraphic8x2244/PallyPowerVanilla` dev head `d5c4383fb56680844490248b2c78d19d1188e3e4`, `1.11.70-dev`, `PallyPowerUI.lua` (notably lines 21-65, 160-246, 264-465, 874-1339, 1401-1847), `PallyPower.lua` (notably lines 983-1059, 1676-1788, 2818-3086), and existing PPV `DEV_PROGRESS.md` design/test history. Stable PPV `main` is `1.11.39` at `a3c6d739992f958a8c45d03dacb3974ff146c99a`. BuffBro's prior audited dev head was `f2d4dfb2f9146d7d330857d0a74523a2c2fd306d`. The audited BuffBro runtime remains `7ee4868...`, version `0.1.7-dev`.
+- Reusable appearance: borderless/no-grey-grid assignments; class-colour vertical textures on the BORDER layer anchored header-icon centre to lowest populated cell centre, crossing blank intermediate provider rows; if no cells assigned, a grey guide to the last visible empty cell with a fading 32px tail; if trailing provider rows are empty, coloured segment stops at last populated cell and grey continuation/fade occupies lower empty tail. Hide all guides with zero visible rows. Class-colour header hover borders revert to black; 32px icon hitboxes, 2px borders and slight native-icon crop. Layout values are adjustable/persistent.
+- Current PPV runtime defaults (override older historical design prose): line width 12px clamped 0-18; vertical/horizontal spacing 12px each clamped 8-64; personal divider 36px clamped 8-64; row height 44px with 32px icons. Class-palette mapping is hardcoded for ten columns, including PET using warrior-brown, while the four special columns use Paladin pink.
+- Visibility is NOT one feature: (1) coloured/grey connector presence is derived from visible provider rows and actual assignment icon textures; (2) class-icon flyouts are single-open, show only when their class has members, have max 15 hardcoded player controls and float above frame; (3) four eye icons toggle Aura/RF/Seal/Judgement **Buff Bar buttons**, not class-column visibility; (4) assignment UI refresh is dirty-state/visible-window gated and rebuilds link geometry on roster or assignment changes. In PPV non-Paladins can still view assignment grid while Buff Bar is hidden.
+- Transfer guidance: implement a BuffBro-owned view renderer from its assignment/provider/target model, not PPV's legacy data/handlers, global names, SavedVariables or casting. Class colours should label target groups; multiple buffs per group/provider, role/unit exceptions and eventual all-class providers must remain expressible. Rendering visibility preferences must never delete or implicitly change assignment intent.
+- Static risks to design out: PPV caps rows at 12 Paladins / 15 players per class, assumes fixed Paladin-specific special columns, stores one texture per main grid cell, places flyouts outside the parent without visible screen-edge clamping, and OnHide does not explicitly reset open flyout state. The linker detects assignment presence through icon textures rather than model records. Validate empty, partial, sparse, many-provider, off-screen, collapsed-filter and role/override layouts in game.
+- Validation provenance: source/behavior static audit only; no image pixel-parity review, new BuffBro code, Lua 5.0.3 compiler check, or BuffBro runtime test conducted. PPV's own documentation records previous user-tested refinements; it does not establish BuffBro rendering parity.
+- Exact next step unchanged: first run and record BuffBro 0.1.7-dev Lua-only UI runtime parity gate at source `7ee4868...`, then GCD diagnosis. After that, scope a standalone BuffBro assignment-model/UI design using only the approved PPV visual language; do not silently broaden into an implementation.
+ 
 ## Planned / Next Work
 - Run the Lua-only parity runtime test before resuming GCD diagnosis.
 - If parity passes, record the exact tested commit/version and then test the existing GCD sweep without changing it first.
