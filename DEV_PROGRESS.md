@@ -3,6 +3,7 @@
 > Live project-development context for a fresh chat. Keep this current and concise. Remove or compress superseded detail once it no longer affects future work.
 
 ## Current
+- Latest audited `dev` branch head before this status-only update: `4772b7c06c7d88fe427294bcff83a52067692612` (2026-09-26); runtime source remains `7ee4868e88b2cc77b68a5906068fedee5360c8d0`.
 - Branch: `dev`
 - Version: `0.1.7-dev`
 - Development source head: `7ee4868e88b2cc77b68a5906068fedee5360c8d0` (Lua-only UI migration implementation; verified live `dev` head before this status-only update).
@@ -118,6 +119,15 @@ Runtime source: `7ee4868e88b2cc77b68a5906068fedee5360c8d0` (`0.1.7-dev`; any fol
 5. Confirm left-click AUTO, right-click normal Blessing, Shift-force behaviour, tooltips, and expected-failure status behaviour are unchanged.
 6. Confirm provider/queue behaviour remains inherited from the previously verified backend baseline.
 7. Then test whether the existing GCD sweep renders. If it still fails, inspect runtime `C_Spell.GetSpellCooldown(61304)` values and independently force a visible cooldown timer before changing the GCD implementation.
+
+## Read-Only Comparison Audit — 2026-11-01
+- Audit branch/head: `dev` at `4772b7c06c7d88fe427294bcff83a52067692612`; addon version remains `0.1.7-dev`. `main` remains the `0.1.6` baseline at `f56b68eb4b7be5110ab680452acd7ed7b392575c`. Latest commits are documentation/rulebook synchronization on 2026-09-26 and 2026-09-25, after the runtime-changing Lua-only migration at `7ee4868e88b2cc77b68a5906068fedee5360c8d0`.
+- Verified implemented from code and earlier user-tested reports: Paladin-only roster/provider/capability scan, PallyPower receive/import adapter, aura observation, raw and execution queues, smart blocked-work rotation, spell-specific range and LoS preflight, AUTO Greater/normal selection, reagent inspection, one-button cast, mini/debug UI construction. Earlier dungeon test results belong to the tested baseline and do not establish current migrated-UI parity.
+- Major feature-parity gaps vs 1.12 PallyPower: no BuffBro-owned editable raid-assignment grid; no outbound BuffBro-native synchronization or PP SELF/ASSIGN broadcasting; no replacement coordination model; no near-expiry countdown/rebuff logic (the queue currently considers a matching aura 'present' without remaining-time threshold); no other class providers; no documented 40-player raid/performance test or automated test suite. The first implementation is a capable PallyPower-assisted Paladin cast client, not yet a standalone coordinator.
+- Code audit candidates requiring test/fix after the current UI parity checkpoint: `BB.BuildExecutionQueue` reads `castMode` without defining/passing it and `BB.ExecuteNext` invokes preflight without its chosen mode; right-click NORMAL preflight may use AUTO's Greater spell range. The fallback question-mark texture paths in `UpdateMiniUI` contain single backslashes and should be checked against Lua string escape rules. The PLPWR ASSIGN/MASSIGN receiver appears to lack the original reference addon's leader/control validation. PallyPower individual overrides are imported from local globals only. Hardcoded English aura names prevent verified localization parity.
+- Untested/deferred: no current runtime validation of `0.1.7-dev` Lua-only frame construction; GCD Model timer remains unresolved; no stress, reconnect, cross-client protocol, secure-casting or localization matrix run. These findings are static audit candidates, not confirmed in-game failures.
+- Scope unchanged: this was a read-only code review plus status documentation update, not a runtime code change or a request to broaden provider implementation. Continue the previously agreed gate before changes to GCD, assignment protocol, or new providers.
+- Exact next step: runtime-test the `0.1.7-dev` Lua-only UI at runtime-source commit `7ee4868e88b2cc77b68a5906068fedee5360c8d0` using the checklist below; then isolate GCD timer data versus rendering. Only after this gate plan independent assignment UI/protocol and impending-expiry rebuffs.
 
 ## Planned / Next Work
 - Run the Lua-only parity runtime test before resuming GCD diagnosis.
