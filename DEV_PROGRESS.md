@@ -3,7 +3,7 @@
 > Live project-development context for a fresh chat. Keep this current and concise. Remove or compress superseded detail once it no longer affects future work.
 
 ## Current
-- Branch: `dev`; verified the prior handoff `fc848b53eb8d8a6f3d9f0fd05a8752c95d553e84` matched actual HEAD before BB-PAL-01 work on **2026-11-05**.
+- Branch: `dev`; **2026-11-05 continuation verified actual starting HEAD `e89832359cc43fc1e565144806e646df29207bde`** (documentation-only parent of this new handoff). Previous BB-PAL-01 implementation handoff verification of `fc848b53eb8d8a6f3d9f0fd05a8752c95d553e84` remains historical provenance.
 - Version (TOC source of truth): **`0.1.8-dev`**.
 - Latest runtime-changing commit: **`663210ce387a4f6413718faeac2d574a30879c85`**, BB-PAL-01 native intent/resolver. This status-only commit follows that code commit; verify actual `dev` HEAD before future work.
 - Latest stable baseline: `0.1.6` on `main` at `f56b68eb4b7be5110ab680452acd7ed7b392575c`.
@@ -19,7 +19,14 @@
 - **Compiler:** **NOT RUN**. Source is reachable through the GitHub connection but no checkout/vendored `tools/lua50/` checker is mounted in the executable environment; no exact Lua 5.0.3 compiler pass can be asserted. The presence of `texlua` (Lua 5.3) does not substitute for the rulebook's required checker.
 - **In-game BB-PAL-01 acceptance:** **NOT RUN / PENDING USER TEST** for PPV-disabled baseline load/UI/mini/debug/queue/cast, native set/clear/queue/cast, reload persistence, local normal override, and two-Paladin duplicate records. No new runtime-pass or baseline-failure claim. A confirmed non-GCD parity failure would block progression and must be handled **inside BB-PAL-01 only**, or stopped with explicit user approval.
 - **Known/deferred:** Existing unresolved GCD sweep; legacy cast-mode preflight risk; PPV receive-only fallback until BB-PAL-06/07; post-Greater normal recast chain until BB-PAL-05; no Blessing assignment grid until BB-PAL-02; no class/individual editing UI permissions until BB-PAL-03/04. Do not claim same-client PPV edit parity or two-way protocol from this chunk.
-- **Exact next action:** User performs the numbered `0.1.8-dev` WoW 1.12.1 + ClassicAPI PPV-disabled BB-PAL-01 runtime matrix below and reports results against code commit `663210ce387a4f6413718faeac2d574a30879c85`. Record pass/fail and resolve any blocking non-GCD failure within BB-PAL-01. Once accepted, start **BB-PAL-02 in a NEW chat**, and implement only its read-only assignment window.
+- **Exact next action:** Obtain user-observed results for the numbered `0.1.8-dev` WoW 1.12.1 + ClassicAPI PPV-disabled BB-PAL-01 matrix, tied to code commit `663210ce387a4f6413718faeac2d574a30879c85`. All ten cases are **NOT RUN** as of this continuation; no live-client results were provided. Record PASS/FAIL only from actual observations; fix only a confirmed non-GCD baseline failure within BB-PAL-01. On user acceptance, start **BB-PAL-02 in a NEW chat** for only its read-only window.
+
+### BB-PAL-01 continuation evidence and acceptance ledger — 2026-11-05
+- **GitHub verification (PASS):** `dev` HEAD `e89832359cc43fc1e565144806e646df29207bde` before this documentation-only update; `BuffBro.toc` version `0.1.8-dev`, interface `11200`, one `BuffBro.lua` runtime loader; last code commit `663210ce387a4f6413718faeac2d574a30879c85` changes only `BuffBro.lua` and `BuffBro.toc`. `main` HEAD verified `f56b68eb4b7be5110ab680452acd7ed7b392575c` (stable `0.1.6`). These are repository/metadata checks, **not** Lua compilation or game tests.
+- **Target-client provenance:** No WoW 1.12.1 runtime session, screenshots, combat logs, chat output or user PASS/FAIL reports were supplied for `663210c`. The previous `0.1.7a` report remains the last recorded live test with an unknown exact Git commit; do not promote inherited results into a `0.1.8-dev` pass.
+- **Acceptance case results (all NOT RUN; no inferred passes):** 1 clean load/mini/border; 2 drag/reload/debug/tooltips; 3 pre-edit baseline queue/click/cast parity; 4 GCD sweep observation (nonblocking, no fix); 5 class set/queue/cast; 6 class clear; 7 class persistence/reload; 8 individual normal override/clear/fallback; 9 two-Paladin same-family records; 10 PPV-disabled reload/persistence/no-new-window/no-outbound regression.
+- **Canonical Lua 5.0.3 compile: NOT RUN.** Host `cc` is available, but no BuffBro checkout or executable checker source is mounted; direct GitHub fetch from the shell failed due DNS/network access. The connected VanillaTemplate `main` branch has `tools/lua50/` documented as **Lua 5.0.3** (its `dev` branch still documents Lua 5.0.2); the rulebook's exact 5.0.3 check remains outstanding. Do not substitute `texlua` 5.3 or claim a compiler pass.
+- **Resolution:** No confirmed non-GCD baseline failure has been reported. **No code, TOC, eight-chunk boundaries, PPV repository, GCD implementation or `main` changes** in this continuation. BB-PAL-01 remains **not user-tested / not accepted**, BB-PAL-02 remains blocked.
 
 ## APPROVED / LOCKED IMPLEMENTATION CONTRACT — 2026-11-04
 
@@ -224,7 +231,7 @@ A failure on non-GCD baseline parity requires BB-PAL-01 resolution before beginn
 - Historical next-step guidance superseded by the 2026-11-04 approved eight-chat Blessing rework. GCD work is explicitly deferred.
  
 ## Planned / Next Work
-- **Current next action:** Run and record the BB-PAL-01 `0.1.8-dev` PPV-disabled runtime matrix above. BB-PAL-01 is not accepted without the required target-client results; fix a confirmed non-GCD baseline blocker only within BB-PAL-01.
+- **Current next action:** Get and record actual user results for all ten BB-PAL-01 `0.1.8-dev` PPV-disabled runtime cases above (currently **all NOT RUN**). BB-PAL-01 is not accepted without target-client evidence; fix a confirmed non-GCD baseline blocker only within BB-PAL-01.
 - Run BB-PAL-02 through BB-PAL-08 in strict numerical order, each in its own fresh development chat. Later implementers may not rewrite this partition list.
 - Keep GCD diagnosis, expiry thresholds, range UX, duplicates UX, other Paladin special columns, other classes and all-class native sync on the deferred backlog. Do not conflate the initial Blessing window with full PPV feature parity.
 - Each chunk's next handoff must cite the exact code commit/version, implemented/checked/user-tested scope and immediate acceptance test/blocker.
@@ -248,4 +255,4 @@ A failure on non-GCD baseline parity requires BB-PAL-01 resolution before beginn
 ## Exact Next Step
 Validate **BB-PAL-01 `0.1.8-dev`, code commit `663210ce387a4f6413718faeac2d574a30879c85`** in the WoW 1.12.1 client with PPV disabled using the numbered matrix above. Capture actual mini/debug/queue/cast parity and native assignment set/clear/reload/override/duplicate results. If a non-GCD baseline test fails, address it **only inside BB-PAL-01** before acceptance; if a blocker cannot be resolved, stop and request an explicit plan amendment rather than silently adding a chat/chunk. On user acceptance, the **next fresh development chat is BB-PAL-02 only: read-only PPV-style Blessing assignment window**. Do not start it here or work on GCD.
 
-**Fresh-chat recovery:** Read `dev_rulebook.md` and this file, verify current `dev` HEAD (the documentation-only handoff commit following `663210ce387a4f6413718faeac2d574a30879c85`) and TOC `0.1.8-dev`, confirm the exact BB-PAL-01 user-test results, then proceed only when its acceptance gate is satisfied.
+**Fresh-chat recovery:** Read unchanged `dev_rulebook.md` and this file. Verify the **new documentation-only `dev` handoff HEAD** (the commit recording this 2026-11-05 continuation) and TOC `0.1.8-dev`. Runtime source commit remains `663210ce387a4f6413718faeac2d574a30879c85`. All ten BB-PAL-01 acceptance cases are NOT RUN until the user supplies in-game evidence; do not interpret a handoff commit as acceptance. When accepted, begin BB-PAL-02 in a separate fresh chat, read-only window only.
