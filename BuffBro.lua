@@ -81,6 +81,21 @@ BB.ReagentCounts = {}
 
 BuffBroDB = BuffBroDB or {}
 
+-- Only user assignment intent is persisted, never derived roster or queue state.
+if type(BuffBroDB.assignmentIntent) ~= "table" then
+    BuffBroDB.assignmentIntent = {}
+end
+BB.Assignments = BuffBroDB.assignmentIntent
+if type(BB.Assignments.paladin) ~= "table" then
+    BB.Assignments.paladin = {}
+end
+if type(BB.Assignments.paladin.classByProvider) ~= "table" then
+    BB.Assignments.paladin.classByProvider = {}
+end
+if type(BB.Assignments.paladin.individualByProvider) ~= "table" then
+    BB.Assignments.paladin.individualByProvider = {}
+end
+
 BB.ClassColors = {
     WARRIOR = { 0.78, 0.61, 0.43 },
     MAGE = { 0.41, 0.80, 0.94 },
@@ -567,6 +582,126 @@ function BB.RefreshProviderDependents(reason)
 end
 
 -- ============================================================================
+-- NATIVE PALADIN ASSIGNMENT INTENT (BB-PAL-01)
+-- ============================================================================
+-- Saved names identify characters across reload/roster changes. The live
+-- provider and target GUIDs still select the actual cast. -1 is an explicit
+-- clear that masks a stale PPV fallback; nil means no native rule yet.
+
+local function BB_AssignmentNameKey(name)
+    if type(name) ~= "string" then return nil end
+    name = string.gsub(name, "^%s+", "")
+    name = string.gsub(name, "%s+$", "")
+    if name == "" then return nil end
+    return string.lower(name)
+end
+
+local function BB_LocalPaladinKey()
+    local _, classToken = UnitClass("player")
+    if classToken ~= "PALADIN" then return nil end
+    return BB_AssignmentNameKey(UnitName("player"))
+end
+
+local function BB_ValidBlessingFamily(family)
+    family = tonumber(family)
+    return family and family >= -1 and family <= 5 and
+        math.floor(family) == family
+end
+
+local function BB_ValidPPClass(classId)
+    classId = tonumber(classId)
+    return classId and classId >= 0 and classId <= 9 and
+        math.floor(classId) == classId
+end
+
+local function BB_GetIntentCell(collection, providerKey, cell)
+    local byProvider = collection[providerKey]
+    if byProvider then return byProvider[cell] end
+    return nil
+end
+
+function BB.GetPaladinClassAssignment(providerName, classId)
+    local providerKey = BB_AssignmentNameKey(providerName)
+    classId = tonumber(classId)
+    if not providerKey or not BB_ValidPPClass(classId) then return nil end
+    return BB_GetIntentCell(BB.Assignments.paladin.classByProvider,
+        providerKey, classId)
+end
+
+function BB.SetPaladinClassAssignment(providerName, classId, family)
+    local providerKey = BB_AssignmentNameKey(providerName)
+    classId = tonumber(classId)
+    family = tonumber(family)
+    if not providerKey then return false, "INVALID_PROVIDER" end
+    if not BB_ValidPPClass(classId) then return false, "INVALID_CLASS" end
+    if not BB_ValidBlessingFamily(family) then
+        return false, "INVALID_BLESSING"
+    end
+
+    -- Do not deduplicate Paladins who independently choose the same Blessing.
+    local localKey = BB_LocalPaladinKey()
+    if providerKey == localKey and family >= 0 then
+        if not BB.IsLocalProviderReady() or
+           not (BB.LocalSpells[family] and BB.LocalSpells[family].normal) then
+            return false, "BLESSING_NOT_LEARNED"
+        end
+    end
+    local provider = BB_FindProviderByName(providerName)
+    if provider and provider.class ~= "PALADIN" then
+        return false, "NOT_PALADIN"
+    end
+
+    local collection = BB.Assignments.paladin.classByProvider
+    local rules = collection[providerKey]
+    if not rules then
+        rules = {}
+        collection[providerKey] = rules
+    end
+    if rules[classId] == family then return true, false end
+    rules[classId] = family
+    BB.BuildRawQueue()
+    BB.Debug.dirty = true
+    return true, true
+end
+
+function BB.GetLocalPaladinOverride(targetName)
+    local providerKey = BB_LocalPaladinKey()
+    local targetKey = BB_AssignmentNameKey(targetName)
+    if not providerKey or not targetKey then return nil end
+    return BB_GetIntentCell(BB.Assignments.paladin.individualByProvider,
+        providerKey, targetKey)
+end
+
+function BB.SetLocalPaladinOverride(targetName, family)
+    local providerKey = BB_LocalPaladinKey()
+    local targetKey = BB_AssignmentNameKey(targetName)
+    family = tonumber(family)
+    if not providerKey then return false, "NOT_PALADIN" end
+    if not targetKey then return false, "INVALID_TARGET" end
+    if not BB_ValidBlessingFamily(family) then
+        return false, "INVALID_BLESSING"
+    end
+    if family >= 0 and
+       (not BB.IsLocalProviderReady() or
+        not (BB.LocalSpells[family] and BB.LocalSpells[family].normal)) then
+        return false, "BLESSING_NOT_LEARNED"
+    end
+    local collection = BB.Assignments.paladin.individualByProvider
+    local rules = collection[providerKey]
+    if not rules then
+        rules = {}
+        collection[providerKey] = rules
+    end
+    if rules[targetKey] == family then return true, false end
+    rules[targetKey] = family
+    BB.BuildRawQueue()
+    BB.Debug.dirty = true
+    return true, true
+end
+
+-- No PLPWR sending, grid, second scheduler or post-Greater chain in this chunk.
+
+-- ============================================================================
 -- PALLYPOWER COMPATIBILITY ADAPTER
 --
 -- Phase 1 is receive-only.
@@ -791,20 +926,41 @@ end
 -- Those belong to the later pre-flight/executor layer.
 -- ============================================================================
 
-local function BB_GetAssignedFamily(provider, member)
-    if not provider or not member then return -1 end
+function BB.ResolvePaladinBlessing(provider, member)
+    if not provider or not member or provider.class ~= "PALADIN" then
+        return -1, nil
+    end
+    local providerKey = BB_AssignmentNameKey(provider.name)
+    local targetKey = BB_AssignmentNameKey(member.name)
+    local localKey = BB_LocalPaladinKey()
 
-    -- Local individual PallyPower override wins over class assignment.
-    -- This exists for faithful Phase-1 side-by-side testing only.
-    local override = provider.individual and provider.individual[member.name]
-    if override ~= nil and override ~= -1 then
-        return override, "INDIVIDUAL"
+    -- Native individual clear falls through to class, but masks a PPV
+    -- individual fallback. Individual overrides never apply to other casters.
+    if providerKey and providerKey == localKey and targetKey then
+        local override = BB_GetIntentCell(
+            BB.Assignments.paladin.individualByProvider,
+            providerKey, targetKey)
+        if override ~= nil then
+            if override >= 0 then return override, "INDIVIDUAL" end
+        else
+            local ppOverride = provider.individual and
+                provider.individual[member.name]
+            if ppOverride ~= nil and ppOverride >= 0 then
+                return ppOverride, "INDIVIDUAL"
+            end
+        end
     end
 
     if member.ppClass == nil then return -1, nil end
-
-    local family = provider.assignments[member.ppClass]
-    if family == nil then return -1, nil end
+    local family
+    if providerKey then
+        family = BB_GetIntentCell(BB.Assignments.paladin.classByProvider,
+            providerKey, member.ppClass)
+    end
+    if family == nil then
+        family = provider.assignments[member.ppClass]
+    end
+    if family == nil or family < 0 then return -1, nil end
     return family, "CLASS"
 end
 
@@ -835,7 +991,7 @@ function BB.BuildRawQueue()
     for _, guid in ipairs(BB.State.rosterOrder) do
         local member = BB.State.roster[guid]
         if member then
-            local family, assignmentType = BB_GetAssignedFamily(provider, member)
+            local family, assignmentType = BB.ResolvePaladinBlessing(provider, member)
             if family ~= nil and family >= 0 and not BB_HasFamily(guid, family) then
                 table.insert(BB.State.rawQueue, {
                     providerGUID = playerGuid,
@@ -2014,6 +2170,88 @@ function BB.DebugAll()
     BB.DebugQueue()
 end
 
+local function BB_ParseBlessingClass(text)
+    local n = tonumber(text)
+    if BB_ValidPPClass(n) then return n end
+    if text == "pet" then return 9 end
+    return BB.PPClassByToken[string.upper(text or "")]
+end
+
+local function BB_ParseBlessingFamily(text)
+    if text == "clear" or text == "none" then return -1 end
+    local n = tonumber(text)
+    if BB_ValidBlessingFamily(n) then return n end
+    local family
+    for family = 0, 5 do
+        local def = BB.BuffFamily[family]
+        if text == string.lower(def.key) or
+           text == string.lower(def.name) then
+            return family
+        end
+    end
+    return nil
+end
+
+local function BB_PrintNativeBlessings()
+    local key = BB_LocalPaladinKey()
+    if not key then
+        BB_Print("Native Blessings: local player is not a Paladin.")
+        return
+    end
+    BB_Print("Native Blessings for " .. tostring(UnitName("player")) .. ":")
+    local classes = BB.Assignments.paladin.classByProvider[key] or {}
+    local classId
+    for classId = 0, 9 do
+        if classes[classId] ~= nil then
+            BB_Print("  " .. tostring(BB.PPClassName[classId]) ..
+                " -> " .. BB_FamilyName(classes[classId]))
+        end
+    end
+    local overrides = BB.Assignments.paladin.individualByProvider[key] or {}
+    local target, family
+    for target, family in pairs(overrides) do
+        BB_Print("  " .. tostring(target) .. " -> " ..
+            BB_FamilyName(family) .. " (local normal override)")
+    end
+    BB_Print("Inspect /bb queue for the existing cast path.")
+end
+
+local function BB_BlessingSlash(msg)
+    if msg == "bless" or msg == "bless help" then
+        BB_Print("  /bb bless class <class|0-9> <family|clear>")
+        BB_Print("  /bb bless player <name> <family|clear>")
+        BB_Print("  /bb bless show")
+        return
+    end
+    if msg == "bless show" then
+        BB_PrintNativeBlessings()
+        return
+    end
+    local _, _, kind, key, familyText =
+        string.find(msg, "^bless%s+(%S+)%s+(%S+)%s+(%S+)%s*$")
+    if not kind then
+        BB_Print("Invalid Blessing command. Use /bb bless help")
+        return
+    end
+    local family = BB_ParseBlessingFamily(familyText)
+    local ok, changed
+    if kind == "class" then
+        ok, changed = BB.SetPaladinClassAssignment(
+            UnitName("player"), BB_ParseBlessingClass(key), family)
+    elseif kind == "player" then
+        ok, changed = BB.SetLocalPaladinOverride(key, family)
+    else
+        BB_Print("Unknown Blessing command. Use /bb bless help")
+        return
+    end
+    if not ok then
+        BB_Print("Blessing edit rejected: " .. tostring(changed))
+    else
+        BB_Print(changed and "Blessing intent saved." or "Blessing intent unchanged.")
+        BB_PrintNativeBlessings()
+    end
+end
+
 local function BB_Slash(msg)
     msg = string.lower(msg or "")
 
@@ -2027,10 +2265,13 @@ local function BB_Slash(msg)
         BB_Print("  /bb debug   (open debug window)")
         BB_Print("  /bb refresh")
         BB_Print("  /bb trace   (toggle quiet debug messages)")
+        BB_Print("  /bb bless help   (native Blessing diagnostics)")
         return
     end
 
-    if msg == "debug" then
+    if string.find(msg, "^bless") then
+        BB_BlessingSlash(msg)
+    elseif msg == "debug" then
         BuffBro_DebugToggle()
     elseif msg == "roster" then
         BuffBro_DebugShow("roster")

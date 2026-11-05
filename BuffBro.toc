@@ -2,7 +2,7 @@
 ## Title: BuffBro-dev
 ## Notes: Modern raid buff coordination for WoW 1.12.1 + ClassicAPI
 ## Author: Seraphic8x2244
-## Version: 0.1.7-dev
+## Version: 0.1.8-dev
 ## Dependencies: !!!ClassicAPI
 ## SavedVariables: BuffBroDB
 
