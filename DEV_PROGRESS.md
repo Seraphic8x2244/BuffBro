@@ -3,13 +3,23 @@
 > Live project-development context for a fresh chat. Keep this current and concise. Remove or compress superseded detail once it no longer affects future work.
 
 ## Current
-- Verified `dev` branch head before the 2026-11-04 planning/status-only update: `7ecec65e19067f18736acd4c8fb474cb6001ea80` (design/visual-audit documentation commit); latest runtime-changing source remains `7ee4868e88b2cc77b68a5906068fedee5360c8d0`.
-- Branch: `dev`
-- Version: `0.1.7-dev`
-- Latest runtime-changing source: `7ee4868e88b2cc77b68a5906068fedee5360c8d0` (Lua-only UI migration; later commits through the verified head affect documentation only).
-- Stable baseline: `0.1.6` on `main` at `f56b68eb4b7be5110ab680452acd7ed7b392575c`.
-- Goal: Execute the **approved eight-chat, fixed-scope Paladin Blessing assignment rework** below, after an initial Lua-only UI/queue parity smoke check. PPV-style Blessing editing, BuffBro-owned intent, correct Greater-to-normal casting chain and two-way PPV class-assignment interoperability are in scope.
-- Current scope boundary: **Planning/status update only** on 2026-11-04. No runtime code, addon version, or PPV code has changed. Do not fix GCD, implement range/expiry UX, add non-Paladin providers, or broaden the locked chunks without explicit user approval. The baseline parity check is the first gate of chunk BB-PAL-01, but an already-known failing GCD sweep does not block this rework.
+- Branch: `dev`; verified the prior handoff `fc848b53eb8d8a6f3d9f0fd05a8752c95d553e84` matched actual HEAD before BB-PAL-01 work on **2026-11-05**.
+- Version (TOC source of truth): **`0.1.8-dev`**.
+- Latest runtime-changing commit: **`663210ce387a4f6413718faeac2d574a30879c85`**, BB-PAL-01 native intent/resolver. This status-only commit follows that code commit; verify actual `dev` HEAD before future work.
+- Latest stable baseline: `0.1.6` on `main` at `f56b68eb4b7be5110ab680452acd7ed7b392575c`.
+- Goal: Work through **BB-PAL-01..08 as eight locked, one-chat-per-chunk steps**, in order. BB-PAL-01 is **implemented and source-checked, not yet target-client-tested or accepted**.
+- Scope boundary: **Stop after BB-PAL-01**. Do not begin BB-PAL-02 without the required BB-PAL-01 runtime acceptance/provenance. The new Blessing window, PPV outbound sends and Greater-chain rewrite belong to later locked chunks; GCD, expiry/range UX and non-Paladin providers remain deferred.
+
+## BB-PAL-01 — Implementation, verification and outstanding acceptance (2026-11-05)
+- **Implementation commit:** `663210ce387a4f6413718faeac2d574a30879c85` on `dev`, version `0.1.8-dev`; changes only `BuffBro.lua` and `BuffBro.toc` (+254/-13 lines in Lua; TOC patch bump). `dev_rulebook.md`, PPV and `main` untouched.
+- **Implemented:** Native persisted Paladin class rules per provider name and local individual normal-Blessing overrides per target name, stored in `BuffBroDB.assignmentIntent.paladin.{classByProvider,individualByProvider}`. Both use stable case-normalized names for reload/roster churn; live roster/provider GUIDs still own target selection. Explicit `-1` clears mask stale PPV fallback; local override clear falls through to class. Getter/setter APIs validate class/family and learned local Blessings, allow separate Paladins to hold same-family rules, and rebuild the **existing** raw/execution queue. `BB.ResolvePaladinBlessing` replaces the old raw-queue resolver; `INDIVIDUAL` remains a normal cast through the existing `BB.ResolveJobSpell` / `BB.ExecuteNext`.
+- **Diagnostic entry point (local Paladin only):** `/bb bless class <class|0-9> <family|clear>`, `/bb bless player <name> <family|clear>`, `/bb bless show`, `/bb queue`; family names are wisdom/might/salvation/light/kings/sanctuary (or 0..5). No new assignment window, network send, second scheduler or Greater cast-chain change.
+- **Before/after parity provenance:** Previous `0.1.7-dev` source and `0.1.8-dev` committed source were examined. The existing Lua UI construction, debug, cooldown/GCD code, roster/provider lifecycle, PPV receive-only adapter, aura scanning, queue, preflight and one-click executor still exist; only assignment resolution is changed. This is **static/source parity only**. No freshly observed WoW baseline mini/debug/cast parity test was possible from this chat; inherited 0.1.5 dungeon and prior 0.1.7a GCD reports are not new tests of this commit.
+- **Static checks actually run (PASS):** 11 pre-commit source assertions and 16 post-commit source assertions verified version/loader, changed-file scope, stable persisted keys, class and individual clear branches, raw queue wiring, individual-normal cast branch, diagnostics, no new PPV outbound calls, preserved GCD constant, and unchanged Lua-only UI entry. Git compare confirms exactly `BuffBro.lua` and `BuffBro.toc` modified. These are source inspections, **not compiler or runtime passes**.
+- **Compiler:** **NOT RUN**. Source is reachable through the GitHub connection but no checkout/vendored `tools/lua50/` checker is mounted in the executable environment; no exact Lua 5.0.3 compiler pass can be asserted. The presence of `texlua` (Lua 5.3) does not substitute for the rulebook's required checker.
+- **In-game BB-PAL-01 acceptance:** **NOT RUN / PENDING USER TEST** for PPV-disabled baseline load/UI/mini/debug/queue/cast, native set/clear/queue/cast, reload persistence, local normal override, and two-Paladin duplicate records. No new runtime-pass or baseline-failure claim. A confirmed non-GCD parity failure would block progression and must be handled **inside BB-PAL-01 only**, or stopped with explicit user approval.
+- **Known/deferred:** Existing unresolved GCD sweep; legacy cast-mode preflight risk; PPV receive-only fallback until BB-PAL-06/07; post-Greater normal recast chain until BB-PAL-05; no Blessing assignment grid until BB-PAL-02; no class/individual editing UI permissions until BB-PAL-03/04. Do not claim same-client PPV edit parity or two-way protocol from this chunk.
+- **Exact next action:** User performs the numbered `0.1.8-dev` WoW 1.12.1 + ClassicAPI PPV-disabled BB-PAL-01 runtime matrix below and reports results against code commit `663210ce387a4f6413718faeac2d574a30879c85`. Record pass/fail and resolve any blocking non-GCD failure within BB-PAL-01. Once accepted, start **BB-PAL-02 in a NEW chat**, and implement only its read-only assignment window.
 
 ## APPROVED / LOCKED IMPLEMENTATION CONTRACT — 2026-11-04
 
@@ -124,6 +134,8 @@
 - Review the ClassicAPI requirement against the rulebook separately; do not opportunistically change dependency policy during the UI migration.
 
 ## Recent Relevant Commits
+- `663210ce387a4f6413718faeac2d574a30879c85` — BB-PAL-01 native persisted Blessing assignment intent, resolver and diagnostic edits (0.1.8-dev; not yet user-tested).
+- `fc848b53eb8d8a6f3d9f0fd05a8752c95d553e84` — Lock approved eight-chunk Paladin contract (status only).
 - `7ee4868e88b2cc77b68a5906068fedee5360c8d0` - Migrate BuffBro UI construction to Lua.
 - `61609228f00b21a3fa8564afb34adc7d911c3161` - Migrate BuffBro to VanillaTemplate workflow.
 - `cab1587d79046271c4606aef49073a9970809591` - Complete BuffBro handoff for fresh-chat continuation.
@@ -142,6 +154,7 @@
 - The summarized 0.1.5 dungeon test reported behaviour otherwise matching PallyPower with core casting/queue behaviour working.
 
 ## Implemented / Awaiting Runtime Test
+- BB-PAL-01 native Paladin assignment engine/resolver and diagnostic slash are implemented in `0.1.8-dev` (`663210ce387a4f6413718faeac2d574a30879c85`); all new runtime paths and Lua-only baseline parity await user testing. See current BB-PAL-01 ledger and exact runtime matrix.
 - Lua-only UI migration is implemented at `7ee4868e88b2cc77b68a5906068fedee5360c8d0`: all former XML-owned frames/regions/scripts are constructed inside `BuffBro.lua`, `BuffBro.xml` is deleted, and its TOC entry is removed.
 - The Lua-only construction recreates the event frame, debug frame and controls, scroll child/text, mini frame, menu/cast/status controls, four-edge class-colour border, and cooldown anchor without changing the existing backend callbacks.
 - Current `dev` reconciles the latest 0.1.7b chat source into `0.1.7-dev`.
@@ -178,15 +191,19 @@
 - Failed: GCD overlay still did not display.
 - Not tested: current 0.1.7b-equivalent Model-frame cooldown renderer; class-colour border visual result; current reagent-aware click-mode delta as reconciled on `dev`.
 
-### Next Runtime Test
-Runtime source: `7ee4868e88b2cc77b68a5906068fedee5360c8d0` (`0.1.7-dev`; any following status-only commit does not change runtime files).
-1. Confirm a clean addon load with no Lua/XML loader errors and no `BuffBro.xml` TOC entry.
-2. Confirm the mini frame has the same layout, dimensions, anchors, icon, status button, and class-colour border presentation.
-3. Confirm Ctrl-drag, saved position, and position restore still work.
-4. Confirm the menu/debug window opens and its tabs, refresh action, scrolling, close/drag behaviour, and rendered state still work.
-5. Confirm left-click AUTO, right-click normal Blessing, Shift-force behaviour, tooltips, and expected-failure status behaviour are unchanged.
-6. Confirm provider/queue behaviour remains inherited from the previously verified backend baseline.
-7. Note whether the existing GCD sweep visibly works, but do **not** diagnose, repair, or block the approved rework on that known issue; defer its dedicated test until after BB-PAL-08.
+### Next Runtime Test — BB-PAL-01 gate (all PENDING, do not infer pass)
+Target: `dev` runtime commit `663210ce387a4f6413718faeac2d574a30879c85`, addon `0.1.8-dev`; **WoW 1.12.1 + ClassicAPI, with PallyPowerVanilla disabled**.
+1. Log in as a Paladin; check clean load/no Lua error and preserved Lua-only mini UI, button/icon/status/class-colour border.
+2. Check Ctrl-drag, reload position restore, debug/menu open, tabs/refresh/scroll/close, and tooltips.
+3. Establish baseline missing Blessing through an existing rule (if available) and verify ready/blocked queue ordering plus left AUTO, right normal, Shift-force and one-click cast; record baseline before native edits.
+4. Note GCD sweep result without repairing it or treating its known failure as a BB-PAL-01 blocker.
+5. Choose a learned Blessing (e.g. `might`), then `/bb bless class paladin might`; with the class lacking it, inspect `/bb queue` and confirm missing-buff job + one-click cast, then aura satisfaction.
+6. `/bb bless class paladin clear`; verify the native rule is cleared and the corresponding native-only work disappears.
+7. Set a class rule again; `/reload`; use `/bb bless show` and `/bb queue` to confirm persisted intent, not a runtime-queue snapshot.
+8. Assign a different learned local normal Blessing with `/bb bless player <character> <family>`; check the individual job and that its spell is **normal** even when Greater is available. Clear the individual override and confirm fallback to the class rule.
+9. With another Paladin present, exercise `BuffBro.SetPaladinClassAssignment("OtherPaladin", 4, <familyID>)` through the normal in-game Lua console and the same family for the local provider; verify separate stored provider records coexist and do not change the local cast owner. This is an API/diagnostic test only, not remote editing permissions.
+10. Reload with PPV still disabled; confirm class + individual native intent persists and a clear remains cleared. Verify no new assignment window/outbound PPV behavior and no regression in mini/debug/queue.
+A failure on non-GCD baseline parity requires BB-PAL-01 resolution before beginning BB-PAL-02. Report each item PASS/FAIL/NOT RUN with character/realm-sensitive details omitted from public logs where appropriate.
 
 ## Historical Read-Only Comparison Audit — 2026-11-01 (superseded where inconsistent with approved 2026-11-04 contract)
 - Audit branch/head: `dev` at `4772b7c06c7d88fe427294bcff83a52067692612`; addon version remains `0.1.7-dev`. `main` remains the `0.1.6` baseline at `f56b68eb4b7be5110ab680452acd7ed7b392575c`. Latest commits are documentation/rulebook synchronization on 2026-09-26 and 2026-09-25, after the runtime-changing Lua-only migration at `7ee4868e88b2cc77b68a5906068fedee5360c8d0`.
@@ -207,7 +224,7 @@ Runtime source: `7ee4868e88b2cc77b68a5906068fedee5360c8d0` (`0.1.7-dev`; any fol
 - Historical next-step guidance superseded by the 2026-11-04 approved eight-chat Blessing rework. GCD work is explicitly deferred.
  
 ## Planned / Next Work
-- **Locked next development action:** Await explicit user request to start **BB-PAL-01**, then run the 0.1.7-dev runtime parity smoke gate and implement the standalone native Paladin Blessing assignment state/resolver, diagnostic edit path, persistence and existing queue integration as prescribed above.
+- **Current next action:** Run and record the BB-PAL-01 `0.1.8-dev` PPV-disabled runtime matrix above. BB-PAL-01 is not accepted without the required target-client results; fix a confirmed non-GCD baseline blocker only within BB-PAL-01.
 - Run BB-PAL-02 through BB-PAL-08 in strict numerical order, each in its own fresh development chat. Later implementers may not rewrite this partition list.
 - Keep GCD diagnosis, expiry thresholds, range UX, duplicates UX, other Paladin special columns, other classes and all-class native sync on the deferred backlog. Do not conflate the initial Blessing window with full PPV feature parity.
 - Each chunk's next handoff must cite the exact code commit/version, implemented/checked/user-tested scope and immediate acceptance test/blocker.
@@ -229,5 +246,6 @@ Runtime source: `7ee4868e88b2cc77b68a5906068fedee5360c8d0` (`0.1.7-dev`; any fol
 - Stable baseline provenance: `main` is `0.1.6` at `f56b68eb4b7be5110ab680452acd7ed7b392575c`. Prior documentation does not prove an exact runtime test of that stable tree, so do not overstate its validation provenance.
 
 ## Exact Next Step
-Wait for the user to explicitly request **BB-PAL-01**. In that new development chat, verify current BuffBro `dev` branch head and version against this handoff, read `dev_rulebook.md`, perform the Lua-only mini/debug/queue parity smoke test (GCD failure recorded but deferred), then implement and test the **BB-PAL-01** standalone native Paladin Blessing class/individual model, persistence, resolver and existing queue connection. Do not begin BB-PAL-02 or GCD diagnosis in the same chat. Refresh `DEV_PROGRESS.md`, commit status and provide a new-chat resume prompt after the chunk.
+Validate **BB-PAL-01 `0.1.8-dev`, code commit `663210ce387a4f6413718faeac2d574a30879c85`** in the WoW 1.12.1 client with PPV disabled using the numbered matrix above. Capture actual mini/debug/queue/cast parity and native assignment set/clear/reload/override/duplicate results. If a non-GCD baseline test fails, address it **only inside BB-PAL-01** before acceptance; if a blocker cannot be resolved, stop and request an explicit plan amendment rather than silently adding a chat/chunk. On user acceptance, the **next fresh development chat is BB-PAL-02 only: read-only PPV-style Blessing assignment window**. Do not start it here or work on GCD.
 
+**Fresh-chat recovery:** Read `dev_rulebook.md` and this file, verify current `dev` HEAD (the documentation-only handoff commit following `663210ce387a4f6413718faeac2d574a30879c85`) and TOC `0.1.8-dev`, confirm the exact BB-PAL-01 user-test results, then proceed only when its acceptance gate is satisfied.
